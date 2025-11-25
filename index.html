@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoVis: The AES-256 Visualizer</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
+    <meta property="og:title" content="CryptoVis: The AES-256 Visualizer">
+    <meta property="og:description" content="An interactive, cyberpunk-themed educational tool for visualizing real-time AES-256 encryption in the browser.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="theme-color" content="#0a0a0f">    
+    <!-- 
+    ╔═══════════════════════════════════════════════════════════════════════════╗
+    ║  CryptoVis: The AES-256 Visualizer                                        ║
+    ║  An educational, interactive visualization of AES-256 encryption          ║
+    ║  Using the Web Crypto API for robust, secure encryption                   ║
+    ║                                                                           ║
+    ║  Security Features:                                                       ║
+    ║  • AES-256-GCM (Galois/Counter Mode) - Authenticated encryption           ║
+    ║  • PBKDF2 Key Derivation - 100,000 iterations for brute-force resistance  ║
+    ║  • Cryptographically secure random Salt (16 bytes)                        ║
+    ║  • Cryptographically secure random IV (12 bytes for GCM)                  ║
+    ╚═══════════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════════
+           CSS CUSTOM PROPERTIES - The Cyberpunk Color Palette
+           ═══════════════════════════════════════════════════════════════════════ */
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #0f0f1a;
+            --bg-tertiary: #141428;
+            --bg-card: rgba(15, 15, 30, 0.8);
+            
+            --neon-green: #00ff41;
+            --neon-cyan: #00d4ff;
+            --neon-purple: #bf00ff;
+            --neon-pink: #ff006a;
+            --neon-yellow: #f0ff00;
+            
+            --text-primary: #e0e0e0;
+            --text-secondary: #8888aa;
+            --text-muted: #4a4a6a;
+            
+            --glow-green: 0 0 20px rgba(0, 255, 65, 0.5), 0 0 40px rgba(0, 255, 65, 0.3);
+            --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.5), 0 0 40px rgba(0, 212, 255, 0.3);
+            --glow-purple: 0 0 20px rgba(191, 0, 255, 0.5), 0 0 40px rgba(191, 0, 255, 0.3);
+            
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --font-display: 'Orbitron', sans-serif;
+            
+            --border-glow: 1px solid rgba(0, 255, 65, 0.3);
+            --border-radius: 8px;
+            
+            --transition-fast: 0.15s ease;
+            --transition-medium: 0.3s ease;
+            --transition-slow: 0.5s ease;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           BASE STYLES & RESET
+           ═══════════════════════════════════════════════════════════════════════ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Scanline effect overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.1) 2px,
+                rgba(0, 0, 0, 0.1) 4px
+            );
+            z-index: 9999;
+        }
+
+        /* Grid background pattern */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background-image: 
+                linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           MATRIX RAIN BACKGROUND
+           ═══════════════════════════════════════════════════════════════════════ */
+        #matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            opacity: 0.15;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           HEADER STYLES
+           ═══════════════════════════════════════════════════════════════════════ */
+        header {
+            text-align: center;
+            padding: 3rem 2rem;
+            position: relative;
+        }
+
+        .logo-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 6vw, 4rem);
+            font-weight: 900;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 50%, var(--neon-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+            filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5));
+            animation: titleGlow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            0% { filter: drop-shadow(0 0 20px rgba(0, 255, 65, 0.5)); }
+            100% { filter: drop-shadow(0 0 40px rgba(0, 212, 255, 0.7)); }
+        }
+
+        .subtitle {
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            color: var(--neon-cyan);
+            letter-spacing: 0.3em;
+            margin-top: 0.5rem;
+            opacity: 0.8;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            margin-left: 1rem;
+            vertical-align: middle;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           MAIN CONTAINER
+           ═══════════════════════════════════════════════════════════════════════ */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem 4rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           CARD STYLES
+           ═══════════════════════════════════════════════════════════════════════ */
+        .card {
+            background: var(--bg-card);
+            border: var(--border-glow);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-green), var(--neon-cyan), var(--neon-purple), transparent);
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--neon-green);
+            letter-spacing: 0.1em;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-title::before {
+            content: '▸';
+            color: var(--neon-cyan);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           INPUT STYLES
+           ═══════════════════════════════════════════════════════════════════════ */
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input,
+        .input-wrapper textarea {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--text-muted);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            transition: all var(--transition-medium);
+        }
+
+        .input-wrapper textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .input-wrapper input:focus,
+        .input-wrapper textarea:focus {
+            outline: none;
+            border-color: var(--neon-green);
+            box-shadow: var(--glow-green), inset 0 0 20px rgba(0, 255, 65, 0.05);
+        }
+
+        .input-wrapper input::placeholder,
+        .input-wrapper textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .input-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.25rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           BUTTON STYLES
+           ═══════════════════════════════════════════════════════════════════════ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: all var(--transition-medium);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-encrypt {
+            background: linear-gradient(135deg, var(--neon-green), #00cc33);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-green);
+        }
+
+        .btn-encrypt:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.4);
+        }
+
+        .btn-decrypt {
+            background: linear-gradient(135deg, var(--neon-cyan), #0099cc);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-decrypt:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.6), 0 0 60px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--neon-purple);
+            color: var(--neon-purple);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(191, 0, 255, 0.1);
+            box-shadow: var(--glow-purple);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Button loading state */
+        .btn.loading {
+            pointer-events: none;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           VISUALIZATION AREA
+           ═══════════════════════════════════════════════════════════════════════ */
+        .viz-container {
+            background: var(--bg-primary);
+            border: 1px solid var(--text-muted);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin: 2rem 0;
+            min-height: 300px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .viz-step {
+            margin-bottom: 2rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all var(--transition-slow);
+        }
+
+        .viz-step.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .viz-step.complete .step-indicator {
+            background: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .step-indicator {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            transition: all var(--transition-medium);
+        }
+
+        .step-title {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--neon-cyan);
+            letter-spacing: 0.05em;
+        }
+
+        .step-description {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-left: 48px;
+            margin-bottom: 1rem;
+        }
+
+        /* Byte grid for visualizing data */
+        .byte-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-left: 48px;
+            max-width: 600px;
+        }
+
+        .byte-cell {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--text-muted);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all var(--transition-medium);
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        .byte-cell.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .byte-cell.highlight-green {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.2);
+        }
+
+        .byte-cell.highlight-cyan {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: inset 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .byte-cell.highlight-purple {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            box-shadow: inset 0 0 10px rgba(191, 0, 255, 0.2);
+        }
+
+        /* Progress bar */
+        .progress-container {
+            margin: 1rem 0;
+            margin-left: 48px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+            max-width: 400px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+            border-radius: 4px;
+            transition: width 0.1s linear;
+        }
+
+        .progress-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           OUTPUT DISPLAY
+           ═══════════════════════════════════════════════════════════════════════ */
+        .output-container {
+            background: var(--bg-primary);
+            border: 1px solid var(--neon-green);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            position: relative;
+            word-break: break-all;
+            font-size: 0.85rem;
+            color: var(--neon-green);
+            box-shadow: inset 0 0 30px rgba(0, 255, 65, 0.05);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all var(--transition-medium);
+        }
+
+        .output-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .output-label {
+            position: absolute;
+            top: -10px;
+            left: 1rem;
+            background: var(--bg-primary);
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--text-muted);
+            color: var(--text-secondary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .copy-btn:hover {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           CRYPTO MATH VISUALIZATION
+           ═══════════════════════════════════════════════════════════════════════ */
+        .crypto-math-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .math-demo {
+            background: var(--bg-secondary);
+            border: 1px solid var(--text-muted);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+        }
+
+        .math-demo-title {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--neon-purple);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .math-demo-description {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.7;
+        }
+
+        .math-canvas-container {
+            background: var(--bg-primary);
+            border-radius: 4px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .math-canvas {
+            width: 100%;
+            height: 200px;
+            display: block;
+        }
+
+        .math-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .math-input {
+            width: 80px;
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--text-muted);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .math-input:focus {
+            outline: none;
+            border-color: var(--neon-purple);
+        }
+
+        .math-result {
+            font-size: 0.9rem;
+            color: var(--neon-yellow);
+            font-weight: 600;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           AES BLOCK ANIMATION
+           ═══════════════════════════════════════════════════════════════════════ */
+        .aes-block-viz {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            width: fit-content;
+            margin-left: 48px;
+        }
+
+        .aes-cell {
+            width: 50px;
+            height: 50px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--text-muted);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all var(--transition-medium);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .aes-cell.transforming {
+            animation: cellTransform 0.5s ease-in-out;
+        }
+
+        @keyframes cellTransform {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); background: var(--neon-cyan); }
+        }
+
+        .aes-cell.shifted {
+            animation: cellShift 0.5s ease-in-out;
+        }
+
+        @keyframes cellShift {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(10px); opacity: 0.5; }
+            100% { transform: translateX(0); }
+        }
+
+        /* Lock animation */
+        .lock-icon {
+            font-size: 4rem;
+            color: var(--text-muted);
+            transition: all var(--transition-slow);
+            opacity: 0;
+        }
+
+        .lock-icon.visible {
+            opacity: 1;
+        }
+
+        .lock-icon.locked {
+            color: var(--neon-green);
+            filter: drop-shadow(var(--glow-green));
+            animation: lockPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes lockPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           TABS
+           ═══════════════════════════════════════════════════════════════════════ */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--text-muted);
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            position: relative;
+            transition: all var(--transition-medium);
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--neon-green);
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           INFO BOXES
+           ═══════════════════════════════════════════════════════════════════════ */
+        .info-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: var(--border-radius);
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .info-box.warning {
+            background: rgba(240, 255, 0, 0.1);
+            border-color: rgba(240, 255, 0, 0.3);
+        }
+
+        .info-box strong {
+            color: var(--neon-cyan);
+        }
+
+        .info-box.warning strong {
+            color: var(--neon-yellow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════════ */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--text-muted);
+            margin-top: 4rem;
+        }
+
+        footer p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+            transition: color var(--transition-fast);
+        }
+
+        footer a:hover {
+            color: var(--neon-green);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           RESPONSIVE DESIGN
+           ═══════════════════════════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            main {
+                padding: 0 1rem 2rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .btn {
+                padding: 0.875rem 1.5rem;
+                font-size: 0.9rem;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn-group .btn {
+                width: 100%;
+            }
+
+            .byte-grid {
+                margin-left: 0;
+            }
+
+            .aes-block-viz {
+                margin-left: 0;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .tab {
+                padding: 0.75rem 1rem;
+                font-size: 0.8rem;
+            }
+
+            .crypto-math-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════
+           GLITCH EFFECT
+           ═══════════════════════════════════════════════════════════════════════ */
+        .glitch {
+            position: relative;
+        }
+
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+        }
+
+        .glitch::before {
+            left: 2px;
+            text-shadow: -2px 0 var(--neon-pink);
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim 5s infinite linear alternate-reverse;
+        }
+
+        .glitch::after {
+            left: -2px;
+            text-shadow: -2px 0 var(--neon-cyan);
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim2 5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(31px, 9999px, 94px, 0); }
+            10% { clip: rect(112px, 9999px, 76px, 0); }
+            20% { clip: rect(85px, 9999px, 77px, 0); }
+            30% { clip: rect(27px, 9999px, 97px, 0); }
+            40% { clip: rect(64px, 9999px, 98px, 0); }
+            50% { clip: rect(61px, 9999px, 85px, 0); }
+            60% { clip: rect(99px, 9999px, 114px, 0); }
+            70% { clip: rect(34px, 9999px, 115px, 0); }
+            80% { clip: rect(98px, 9999px, 129px, 0); }
+            90% { clip: rect(43px, 9999px, 96px, 0); }
+            100% { clip: rect(82px, 9999px, 68px, 0); }
+        }
+
+        @keyframes glitch-anim2 {
+            0% { clip: rect(129px, 9999px, 36px, 0); }
+            10% { clip: rect(36px, 9999px, 4px, 0); }
+            20% { clip: rect(85px, 9999px, 66px, 0); }
+            30% { clip: rect(91px, 9999px, 91px, 0); }
+            40% { clip: rect(148px, 9999px, 138px, 0); }
+            50% { clip: rect(38px, 9999px, 122px, 0); }
+            60% { clip: rect(69px, 9999px, 54px, 0); }
+            70% { clip: rect(98px, 9999px, 71px, 0); }
+            80% { clip: rect(146px, 9999px, 34px, 0); }
+            90% { clip: rect(134px, 9999px, 43px, 0); }
+            100% { clip: rect(102px, 9999px, 80px, 0); }
+        }
+
+        /* Status indicator */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .status-dot.active {
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix rain background canvas -->
+    <canvas id="matrix-bg"></canvas>
+
+    <header>
+        <div class="logo-container">
+            <h1 class="glitch" data-text="CryptoVis">CryptoVis</h1>
+            <span class="version-badge">AES-256</span>
+        </div>
+        <p class="subtitle">Interactive Encryption Visualizer</p>
+    </header>
+
+    <main>
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab active" data-tab="encrypt">🔐 Encrypt</button>
+            <button class="tab" data-tab="decrypt">🔓 Decrypt</button>
+            <button class="tab" data-tab="learn">📚 Learn</button>
+        </div>
+
+        <!-- Encryption Tab -->
+        <div id="encrypt-tab" class="tab-content active">
+            <div class="card">
+                <h2 class="card-title">Secure Encryption</h2>
+                
+                <div class="input-group">
+                    <label for="message">Secret Message</label>
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="message" 
+                            placeholder="Enter your secret message here..."
+                            autocomplete="off"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Password (Encryption Key)</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="password" 
+                            id="password" 
+                            placeholder="Enter a strong password..."
+                            autocomplete="new-password"
+                        >
+                        <span class="input-icon">🔑</span>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <strong>🛡️ Security Note:</strong> Your password is never stored. It's used to derive a 256-bit encryption key using PBKDF2 with 100,000 iterations, making brute-force attacks computationally infeasible.
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-encrypt" id="encrypt-btn">
+                        <span>🔒</span> Encrypt Message
+                    </button>
+                    <button class="btn btn-secondary" id="clear-btn">
+                        <span>🗑️</span> Clear
+                    </button>
+                </div>
+
+                <!-- Visualization Area -->
+                <div class="viz-container" id="viz-container">
+                    <div class="viz-step" id="step-salt">
+                        <div class="step-header">
+                            <div class="step-indicator">1</div>
+                            <span class="step-title">Generating Salt</span>
+                        </div>
+                        <p class="step-description">
+                            Creating 16 cryptographically secure random bytes to protect against rainbow table attacks.
+                        </p>
+                        <div class="byte-grid" id="salt-bytes"></div>
+                    </div>
+
+                    <div class="viz-step" id="step-key">
+                        <div class="step-header">
+                            <div class="step-indicator">2</div>
+                            <span class="step-title">Deriving Key (PBKDF2)</span>
+                        </div>
+                        <p class="step-description">
+                            Running 100,000 HMAC-SHA256 iterations to derive a 256-bit encryption key.
+                        </p>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="pbkdf2-progress"></div>
+                            </div>
+                            <div class="progress-label" id="pbkdf2-label">0 / 100,000 iterations</div>
+                        </div>
+                    </div>
+
+                    <div class="viz-step" id="step-iv">
+                        <div class="step-header">
+                            <div class="step-indicator">3</div>
+                            <span class="step-title">Generating IV</span>
+                        </div>
+                        <p class="step-description">
+                            Creating a 12-byte Initialization Vector for GCM mode (ensures unique ciphertext each time).
+                        </p>
+                        <div class="byte-grid" id="iv-bytes"></div>
+                    </div>
+
+                    <div class="viz-step" id="step-aes">
+                        <div class="step-header">
+                            <div class="step-indicator">4</div>
+                            <span class="step-title">AES-256-GCM Encryption</span>
+                        </div>
+                        <p class="step-description">
+                            Encrypting data in 128-bit blocks with authenticated encryption.
+                        </p>
+                        <div class="aes-block-viz" id="aes-blocks"></div>
+                    </div>
+
+                    <div class="viz-step" id="step-complete">
+                        <div class="step-header">
+                            <div class="step-indicator">✓</div>
+                            <span class="step-title">Encryption Complete</span>
+                        </div>
+                        <p class="step-description">
+                            Your message is now securely encrypted with authenticated encryption.
+                        </p>
+                        <div style="text-align: center; padding: 2rem;">
+                            <div class="lock-icon" id="lock-icon">🔒</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output -->
+                <div class="output-container" id="ciphertext-output">
+                    <span class="output-label">Encrypted Output (Base64)</span>
+                    <button class="copy-btn" id="copy-cipher-btn">📋 Copy</button>
+                    <code id="ciphertext"></code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Decryption Tab -->
+        <div id="decrypt-tab" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Decrypt Message</h2>
+                
+                <div class="input-group">
+                    <label for="cipher-input">Encrypted Message (Base64)</label>
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="cipher-input" 
+                            placeholder="Paste your encrypted message here..."
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="decrypt-password">Password</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="password" 
+                            id="decrypt-password" 
+                            placeholder="Enter the decryption password..."
+                        >
+                        <span class="input-icon">🔑</span>
+                    </div>
+                </div>
+
+                <div class="info-box warning">
+                    <strong>⚠️ Important:</strong> You must use the exact same password that was used to encrypt the message. The Salt and IV are embedded in the ciphertext.
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-decrypt" id="decrypt-btn">
+                        <span>🔓</span> Decrypt Message
+                    </button>
+                </div>
+
+                <div class="output-container" id="plaintext-output">
+                    <span class="output-label">Decrypted Message</span>
+                    <button class="copy-btn" id="copy-plain-btn">📋 Copy</button>
+                    <code id="plaintext"></code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Learn Tab -->
+        <div id="learn-tab" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Cryptography Fundamentals</h2>
+                
+                <div class="info-box">
+                    <strong>🎓 Educational Demo:</strong> Below are interactive visualizations of real cryptographic operations used in AES encryption.
+                </div>
+
+                <div class="crypto-math-section">
+                    <!-- Galois Field Multiplication Demo -->
+                    <div class="math-demo">
+                        <h3 class="math-demo-title">
+                            <span>⊗</span> Galois Field Multiplication (GF(2⁸))
+                        </h3>
+                        <p class="math-demo-description">
+                            AES uses multiplication in the Galois Field GF(2⁸) for its MixColumns step. 
+                            This is multiplication modulo the irreducible polynomial x⁸ + x⁴ + x³ + x + 1 (0x11B).
+                            Unlike normal multiplication, there's no overflow—results always stay within 0-255.
+                        </p>
+                        <div class="math-canvas-container">
+                            <canvas id="gf-canvas" class="math-canvas"></canvas>
+                        </div>
+                        <div class="math-controls">
+                            <input type="number" id="gf-a" class="math-input" value="87" min="0" max="255" placeholder="A">
+                            <span style="color: var(--neon-purple);">⊗</span>
+                            <input type="number" id="gf-b" class="math-input" value="131" min="0" max="255" placeholder="B">
+                            <span style="color: var(--text-muted);">=</span>
+                            <span class="math-result" id="gf-result">193</span>
+                            <button class="btn btn-secondary" id="gf-calc" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Calculate</button>
+                        </div>
+                    </div>
+
+                    <!-- S-Box Substitution Demo -->
+                    <div class="math-demo">
+                        <h3 class="math-demo-title">
+                            <span>📦</span> AES S-Box (SubBytes)
+                        </h3>
+                        <p class="math-demo-description">
+                            The S-Box is a non-linear substitution table that provides confusion in AES.
+                            Each byte is replaced by its multiplicative inverse in GF(2⁸), followed by an affine transformation.
+                            This makes the cipher resistant to linear and differential cryptanalysis.
+                        </p>
+                        <div class="math-canvas-container">
+                            <canvas id="sbox-canvas" class="math-canvas"></canvas>
+                        </div>
+                        <div class="math-controls">
+                            <span style="color: var(--text-muted);">Input byte:</span>
+                            <input type="number" id="sbox-input" class="math-input" value="25" min="0" max="255" placeholder="0-255">
+                            <span style="color: var(--text-muted);">→ S-Box →</span>
+                            <span class="math-result" id="sbox-result">0x5F</span>
+                            <button class="btn btn-secondary" id="sbox-calc" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Transform</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Educational Content -->
+                <div style="margin-top: 3rem;">
+                    <h3 class="card-title" style="margin-top: 2rem;">Why These Steps Matter</h3>
+                    
+                    <div style="margin-top: 1.5rem;">
+                        <h4 style="color: var(--neon-green); margin-bottom: 0.75rem;">🧂 What is Salt?</h4>
+                        <p style="color: var(--text-secondary); line-height: 1.8; margin-bottom: 1.5rem;">
+                            Salt is random data added to the password before hashing. Without salt, attackers could 
+                            precompute hashes for common passwords (rainbow tables) and instantly crack them. 
+                            With a unique salt for each encryption, even identical passwords produce completely 
+                            different keys, making precomputation attacks useless.
+                        </p>
+
+                        <h4 style="color: var(--neon-cyan); margin-bottom: 0.75rem;">🎲 What is an IV (Initialization Vector)?</h4>
+                        <p style="color: var(--text-secondary); line-height: 1.8; margin-bottom: 1.5rem;">
+                            The IV ensures that encrypting the same message with the same key produces different 
+                            ciphertext each time. This prevents attackers from detecting patterns (semantic security).
+                            For GCM mode, the IV must be unique for every encryption—reusing an IV completely 
+                            breaks the security guarantees.
+                        </p>
+
+                        <h4 style="color: var(--neon-purple); margin-bottom: 0.75rem;">🔄 What is PBKDF2?</h4>
+                        <p style="color: var(--text-secondary); line-height: 1.8;">
+                            Password-Based Key Derivation Function 2 transforms a password into a cryptographic key.
+                            By running 100,000 iterations of HMAC-SHA256, we make each password guess expensive.
+                            An attacker trying billions of passwords would need years of computation, while 
+                            legitimate users only wait milliseconds.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>
+            <span class="status-dot active"></span>
+            Built with the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API" target="_blank">Web Crypto API</a> 
+            • 100% Client-Side Encryption • No Data Sent to Servers
+        </p>
+        <p style="margin-top: 0.5rem;">
+            <a href="https://github.com" target="_blank">⭐ Star on GitHub</a>
+        </p>
+    </footer>
+
+    <script>
+        /**
+         * ═══════════════════════════════════════════════════════════════════════════
+         * CryptoVis: AES-256 Encryption Visualizer
+         * 
+         * This application demonstrates AES-256-GCM encryption using the Web Crypto API.
+         * All cryptographic operations happen entirely in your browser—no data is ever
+         * sent to external servers.
+         * 
+         * Security Architecture:
+         * ─────────────────────
+         * 1. Salt: 16 random bytes (128 bits) - Prevents rainbow table attacks
+         * 2. PBKDF2: 100,000 iterations with SHA-256 - Slow key derivation
+         * 3. IV: 12 random bytes (96 bits) - Required for GCM uniqueness
+         * 4. AES-256-GCM: Authenticated encryption with 128-bit auth tag
+         * 
+         * Ciphertext Format: [Salt (16)] + [IV (12)] + [Ciphertext + AuthTag]
+         * ═══════════════════════════════════════════════════════════════════════════
+         */
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // MATRIX RAIN BACKGROUND ANIMATION
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        const matrixCanvas = document.getElementById('matrix-bg');
+        const matrixCtx = matrixCanvas.getContext('2d');
+        
+        function initMatrix() {
+            matrixCanvas.width = window.innerWidth;
+            matrixCanvas.height = window.innerHeight;
+            
+            const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+            const fontSize = 14;
+            const columns = Math.floor(matrixCanvas.width / fontSize);
+            const drops = Array(columns).fill(1);
+            
+            function draw() {
+                matrixCtx.fillStyle = 'rgba(10, 10, 15, 0.05)';
+                matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+                
+                matrixCtx.fillStyle = '#00ff41';
+                matrixCtx.font = `${fontSize}px monospace`;
+                
+                for (let i = 0; i < drops.length; i++) {
+                    const char = chars[Math.floor(Math.random() * chars.length)];
+                    matrixCtx.fillText(char, i * fontSize, drops[i] * fontSize);
+                    
+                    if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+            
+            setInterval(draw, 50);
+        }
+        
+        window.addEventListener('resize', () => {
+            matrixCanvas.width = window.innerWidth;
+            matrixCanvas.height = window.innerHeight;
+        });
+        
+        initMatrix();
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // TAB NAVIGATION
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and content
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                tab.classList.add('active');
+                const tabId = tab.dataset.tab + '-tab';
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CRYPTO UTILITY FUNCTIONS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /**
+         * Converts an ArrayBuffer to a hexadecimal string
+         * @param {ArrayBuffer} buffer - The buffer to convert
+         * @returns {string} Hexadecimal representation
+         */
+        function bufferToHex(buffer) {
+            return Array.from(new Uint8Array(buffer))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        }
+
+        /**
+         * Converts an ArrayBuffer to a Base64 string
+         * @param {ArrayBuffer} buffer - The buffer to convert
+         * @returns {string} Base64 representation
+         */
+        function bufferToBase64(buffer) {
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        }
+
+        /**
+         * Converts a Base64 string to an ArrayBuffer
+         * @param {string} base64 - The Base64 string to convert
+         * @returns {ArrayBuffer} The decoded buffer
+         */
+        function base64ToBuffer(base64) {
+            const binary = atob(base64);
+            const buffer = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                buffer[i] = binary.charCodeAt(i);
+            }
+            return buffer;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // AES-256-GCM ENCRYPTION
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /**
+         * Derives a 256-bit encryption key from a password using PBKDF2
+         * 
+         * PBKDF2 (Password-Based Key Derivation Function 2) applies a pseudorandom
+         * function (HMAC-SHA256) to the password along with a salt, iterating many
+         * times to produce a derived key. This makes brute-force attacks expensive.
+         * 
+         * @param {string} password - The user's password
+         * @param {Uint8Array} salt - Random salt (16 bytes)
+         * @param {function} progressCallback - Called with progress updates
+         * @returns {Promise<CryptoKey>} The derived AES-256 key
+         */
+        async function deriveKey(password, salt, progressCallback) {
+            // First, import the password as a raw key for PBKDF2
+            const passwordKey = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(password),
+                'PBKDF2',
+                false,
+                ['deriveBits', 'deriveKey']
+            );
+
+            // Simulate progress (actual PBKDF2 doesn't provide progress callbacks)
+            if (progressCallback) {
+                for (let i = 0; i <= 100; i += 5) {
+                    progressCallback(i);
+                    await new Promise(r => setTimeout(r, 20));
+                }
+            }
+
+            // Derive the actual encryption key using PBKDF2
+            // 100,000 iterations is the minimum recommended for password hashing
+            return crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: 100000,  // High iteration count for security
+                    hash: 'SHA-256'
+                },
+                passwordKey,
+                { name: 'AES-GCM', length: 256 },  // 256-bit AES key
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        /**
+         * Encrypts a message using AES-256-GCM
+         * 
+         * AES-GCM (Galois/Counter Mode) provides both encryption and authentication.
+         * The 128-bit authentication tag ensures the ciphertext hasn't been tampered with.
+         * 
+         * @param {string} message - The plaintext message
+         * @param {string} password - The encryption password
+         * @param {object} callbacks - Animation callbacks
+         * @returns {Promise<string>} Base64-encoded ciphertext with embedded salt and IV
+         */
+        async function encryptMessage(message, password, callbacks = {}) {
+            try {
+                // Step 1: Generate a cryptographically secure random salt (16 bytes = 128 bits)
+                // The salt ensures the same password produces different keys each time
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                if (callbacks.onSalt) await callbacks.onSalt(salt);
+
+                // Step 2: Derive the encryption key using PBKDF2
+                // This transforms the password into a 256-bit key suitable for AES
+                const key = await deriveKey(password, salt, callbacks.onKeyProgress);
+                if (callbacks.onKey) await callbacks.onKey();
+
+                // Step 3: Generate a random IV (12 bytes = 96 bits for GCM)
+                // The IV must be unique for every encryption with the same key
+                // WARNING: Reusing an IV with the same key completely breaks GCM security!
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                if (callbacks.onIV) await callbacks.onIV(iv);
+
+                // Step 4: Encrypt the message using AES-256-GCM
+                // The result includes the ciphertext AND a 128-bit authentication tag
+                const encodedMessage = new TextEncoder().encode(message);
+                const ciphertext = await crypto.subtle.encrypt(
+                    {
+                        name: 'AES-GCM',
+                        iv: iv,
+                        tagLength: 128  // 128-bit authentication tag
+                    },
+                    key,
+                    encodedMessage
+                );
+                if (callbacks.onEncrypt) await callbacks.onEncrypt(ciphertext);
+
+                // Step 5: Combine salt + IV + ciphertext into a single output
+                // This allows the recipient to extract the salt and IV for decryption
+                const combined = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+                combined.set(salt, 0);                              // Bytes 0-15: Salt
+                combined.set(iv, salt.length);                      // Bytes 16-27: IV
+                combined.set(new Uint8Array(ciphertext), salt.length + iv.length);  // Bytes 28+: Ciphertext
+
+                if (callbacks.onComplete) await callbacks.onComplete();
+
+                return bufferToBase64(combined);
+            } catch (error) {
+                throw new Error(`Encryption failed: ${error.message}`);
+            }
+        }
+
+        /**
+         * Decrypts a message encrypted with encryptMessage()
+         * 
+         * @param {string} ciphertextBase64 - Base64-encoded ciphertext with embedded salt and IV
+         * @param {string} password - The decryption password
+         * @returns {Promise<string>} The decrypted plaintext
+         */
+        async function decryptMessage(ciphertextBase64, password) {
+            try {
+                const combined = base64ToBuffer(ciphertextBase64);
+                
+                // Extract the salt (first 16 bytes)
+                const salt = combined.slice(0, 16);
+                
+                // Extract the IV (next 12 bytes)
+                const iv = combined.slice(16, 28);
+                
+                // Extract the ciphertext (remaining bytes, including auth tag)
+                const ciphertext = combined.slice(28);
+
+                // Derive the same key using the extracted salt
+                const key = await deriveKey(password, salt);
+
+                // Decrypt and verify the authentication tag
+                // If the tag doesn't match (tampering detected), this throws an error
+                const decrypted = await crypto.subtle.decrypt(
+                    {
+                        name: 'AES-GCM',
+                        iv: iv,
+                        tagLength: 128
+                    },
+                    key,
+                    ciphertext
+                );
+
+                return new TextDecoder().decode(decrypted);
+            } catch (error) {
+                if (error.name === 'OperationError') {
+                    throw new Error('Decryption failed: Wrong password or corrupted data');
+                }
+                throw new Error(`Decryption failed: ${error.message}`);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CUSTOM CRYPTO MATH IMPLEMENTATIONS
+        // These demonstrate the actual mathematical operations used inside AES
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /**
+         * CRYPTO MATH SAMPLE 1: Galois Field Multiplication in GF(2^8)
+         * 
+         * AES operates in the Galois Field GF(2^8), where arithmetic is performed
+         * modulo an irreducible polynomial. This is used in the MixColumns step.
+         * 
+         * The irreducible polynomial for AES is: x^8 + x^4 + x^3 + x + 1 (0x11B)
+         * 
+         * In GF(2^8):
+         * - Addition is XOR
+         * - Multiplication is polynomial multiplication mod 0x11B
+         * 
+         * @param {number} a - First byte (0-255)
+         * @param {number} b - Second byte (0-255)
+         * @returns {number} Product in GF(2^8)
+         */
+        function gfMultiply(a, b) {
+            let result = 0;
+            let tempA = a;
+            let tempB = b;
+
+            // Peasant multiplication algorithm adapted for GF(2^8)
+            for (let i = 0; i < 8; i++) {
+                // If the lowest bit of b is set, XOR a into the result
+                if (tempB & 1) {
+                    result ^= tempA;
+                }
+
+                // Check if a will overflow (highest bit set)
+                const highBitSet = tempA & 0x80;
+
+                // Left shift a (multiply by x in polynomial terms)
+                tempA <<= 1;
+
+                // If overflow occurred, reduce modulo the AES polynomial (0x11B)
+                // 0x11B = x^8 + x^4 + x^3 + x + 1
+                if (highBitSet) {
+                    tempA ^= 0x11B;
+                }
+
+                // Right shift b to process the next bit
+                tempB >>= 1;
+            }
+
+            return result & 0xFF;
+        }
+
+        /**
+         * CRYPTO MATH SAMPLE 2: AES S-Box Computation
+         * 
+         * The S-Box provides non-linearity (confusion) in AES. Each byte is transformed by:
+         * 1. Computing its multiplicative inverse in GF(2^8) (0 maps to 0)
+         * 2. Applying an affine transformation
+         * 
+         * The affine transformation over GF(2) is:
+         * b'_i = b_i ⊕ b_{(i+4) mod 8} ⊕ b_{(i+5) mod 8} ⊕ b_{(i+6) mod 8} ⊕ b_{(i+7) mod 8} ⊕ c_i
+         * where c = 0x63 = 01100011
+         * 
+         * @param {number} byte - Input byte (0-255)
+         * @returns {number} S-Box output
+         */
+        function computeSBox(byte) {
+            // Step 1: Compute multiplicative inverse in GF(2^8)
+            // We use the extended Euclidean algorithm (or equivalently, Fermat's little theorem)
+            // For efficiency, we use: a^(-1) = a^(254) in GF(2^8)
+            let inverse = 0;
+            if (byte !== 0) {
+                // Compute a^254 using square-and-multiply
+                let power = byte;
+                inverse = 1;
+                
+                // 254 = 11111110 in binary
+                // We compute a^254 = a^128 * a^64 * a^32 * a^16 * a^8 * a^4 * a^2
+                for (let i = 0; i < 7; i++) {
+                    inverse = gfMultiply(inverse, inverse);  // Square
+                    inverse = gfMultiply(inverse, byte);     // Multiply
+                }
+                inverse = gfMultiply(inverse, inverse);      // Final square (no multiply, since bit 0 of 254 is 0)
+            }
+
+            // Step 2: Apply affine transformation
+            // The transformation matrix and constant are designed for good cryptographic properties
+            let result = inverse;
+            let temp = inverse;
+            
+            // Rotate and XOR
+            for (let i = 0; i < 4; i++) {
+                temp = ((temp << 1) | (temp >> 7)) & 0xFF;  // Circular left shift
+                result ^= temp;
+            }
+            
+            // XOR with constant 0x63
+            result ^= 0x63;
+
+            return result & 0xFF;
+        }
+
+        // Pre-computed S-Box lookup table for visualization
+        const SBOX = new Array(256);
+        for (let i = 0; i < 256; i++) {
+            SBOX[i] = computeSBox(i);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // VISUALIZATION FUNCTIONS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /**
+         * Displays bytes in the byte grid with animation
+         */
+        async function displayBytes(containerId, bytes, highlightClass) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            for (let i = 0; i < bytes.length; i++) {
+                const cell = document.createElement('div');
+                cell.className = `byte-cell ${highlightClass}`;
+                cell.textContent = bytes[i].toString(16).padStart(2, '0').toUpperCase();
+                container.appendChild(cell);
+
+                // Staggered animation
+                await new Promise(r => setTimeout(r, 50));
+                cell.classList.add('visible');
+            }
+        }
+
+        /**
+         * Creates the AES block visualization
+         */
+        function createAESBlockViz() {
+            const container = document.getElementById('aes-blocks');
+            container.innerHTML = '';
+
+            // AES operates on 4x4 blocks of bytes (128 bits)
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'aes-cell';
+                cell.id = `aes-cell-${i}`;
+                cell.textContent = '??';
+                container.appendChild(cell);
+            }
+        }
+
+        /**
+         * Animates the AES encryption process
+         */
+        async function animateAESEncryption(ciphertext) {
+            const bytes = new Uint8Array(ciphertext);
+            const blockSize = Math.min(16, bytes.length);
+
+            for (let i = 0; i < blockSize; i++) {
+                const cell = document.getElementById(`aes-cell-${i}`);
+                cell.classList.add('transforming');
+                await new Promise(r => setTimeout(r, 100));
+                cell.textContent = bytes[i].toString(16).padStart(2, '0').toUpperCase();
+                cell.style.borderColor = 'var(--neon-green)';
+                cell.style.color = 'var(--neon-green)';
+            }
+        }
+
+        /**
+         * Shows a visualization step
+         */
+        function showStep(stepId) {
+            const step = document.getElementById(stepId);
+            step.classList.add('active');
+        }
+
+        /**
+         * Marks a step as complete
+         */
+        function completeStep(stepId) {
+            const step = document.getElementById(stepId);
+            step.classList.add('complete');
+        }
+
+        /**
+         * Resets all visualization steps
+         */
+        function resetVisualization() {
+            document.querySelectorAll('.viz-step').forEach(step => {
+                step.classList.remove('active', 'complete');
+            });
+            document.getElementById('salt-bytes').innerHTML = '';
+            document.getElementById('iv-bytes').innerHTML = '';
+            document.getElementById('aes-blocks').innerHTML = '';
+            document.getElementById('pbkdf2-progress').style.width = '0%';
+            document.getElementById('pbkdf2-label').textContent = '0 / 100,000 iterations';
+            document.getElementById('ciphertext-output').classList.remove('visible');
+            document.getElementById('lock-icon').classList.remove('visible', 'locked');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // EVENT HANDLERS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        // Encrypt button
+        document.getElementById('encrypt-btn').addEventListener('click', async () => {
+            const message = document.getElementById('message').value;
+            const password = document.getElementById('password').value;
+
+            if (!message || !password) {
+                alert('Please enter both a message and password.');
+                return;
+            }
+
+            const btn = document.getElementById('encrypt-btn');
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btn.innerHTML = '<span></span> Encrypting...';
+
+            resetVisualization();
+            createAESBlockViz();
+
+            try {
+                const ciphertext = await encryptMessage(message, password, {
+                    onSalt: async (salt) => {
+                        showStep('step-salt');
+                        await displayBytes('salt-bytes', salt, 'highlight-green');
+                        await new Promise(r => setTimeout(r, 500));
+                        completeStep('step-salt');
+                    },
+                    onKeyProgress: (progress) => {
+                        showStep('step-key');
+                        document.getElementById('pbkdf2-progress').style.width = progress + '%';
+                        document.getElementById('pbkdf2-label').textContent = 
+                            `${Math.floor(progress * 1000)} / 100,000 iterations`;
+                    },
+                    onKey: async () => {
+                        await new Promise(r => setTimeout(r, 300));
+                        completeStep('step-key');
+                    },
+                    onIV: async (iv) => {
+                        showStep('step-iv');
+                        await displayBytes('iv-bytes', iv, 'highlight-cyan');
+                        await new Promise(r => setTimeout(r, 500));
+                        completeStep('step-iv');
+                    },
+                    onEncrypt: async (ciphertext) => {
+                        showStep('step-aes');
+                        await animateAESEncryption(ciphertext);
+                        await new Promise(r => setTimeout(r, 500));
+                        completeStep('step-aes');
+                    },
+                    onComplete: async () => {
+                        showStep('step-complete');
+                        const lockIcon = document.getElementById('lock-icon');
+                        lockIcon.classList.add('visible');
+                        await new Promise(r => setTimeout(r, 300));
+                        lockIcon.classList.add('locked');
+                        completeStep('step-complete');
+                    }
+                });
+
+                // Display the ciphertext
+                document.getElementById('ciphertext').textContent = ciphertext;
+                document.getElementById('ciphertext-output').classList.add('visible');
+
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btn.innerHTML = '<span>🔒</span> Encrypt Message';
+            }
+        });
+
+        // Decrypt button
+        document.getElementById('decrypt-btn').addEventListener('click', async () => {
+            const ciphertext = document.getElementById('cipher-input').value;
+            const password = document.getElementById('decrypt-password').value;
+
+            if (!ciphertext || !password) {
+                alert('Please enter both the encrypted message and password.');
+                return;
+            }
+
+            const btn = document.getElementById('decrypt-btn');
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btn.innerHTML = '<span></span> Decrypting...';
+
+            try {
+                const plaintext = await decryptMessage(ciphertext, password);
+                document.getElementById('plaintext').textContent = plaintext;
+                document.getElementById('plaintext-output').classList.add('visible');
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btn.innerHTML = '<span>🔓</span> Decrypt Message';
+            }
+        });
+
+        // Clear button
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            document.getElementById('message').value = '';
+            document.getElementById('password').value = '';
+            resetVisualization();
+        });
+
+        // Copy buttons
+        document.getElementById('copy-cipher-btn').addEventListener('click', () => {
+            const text = document.getElementById('ciphertext').textContent;
+            navigator.clipboard.writeText(text);
+            const btn = document.getElementById('copy-cipher-btn');
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => btn.textContent = '📋 Copy', 2000);
+        });
+
+        document.getElementById('copy-plain-btn').addEventListener('click', () => {
+            const text = document.getElementById('plaintext').textContent;
+            navigator.clipboard.writeText(text);
+            const btn = document.getElementById('copy-plain-btn');
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => btn.textContent = '📋 Copy', 2000);
+        });
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CRYPTO MATH VISUALIZATIONS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /**
+         * Draws the Galois Field multiplication visualization
+         */
+        function drawGFVisualization(a, b, result) {
+            const canvas = document.getElementById('gf-canvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            const width = rect.width;
+            const height = rect.height;
+
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw binary representations
+            ctx.font = '12px JetBrains Mono';
+            ctx.textAlign = 'center';
+
+            const aBinary = a.toString(2).padStart(8, '0');
+            const bBinary = b.toString(2).padStart(8, '0');
+            const resultBinary = result.toString(2).padStart(8, '0');
+
+            // Draw A
+            ctx.fillStyle = '#00ff41';
+            ctx.fillText(`A = ${a} (0x${a.toString(16).toUpperCase().padStart(2, '0')})`, width / 4, 30);
+            drawBinaryBits(ctx, aBinary, width / 4 - 60, 45, '#00ff41');
+
+            // Draw B
+            ctx.fillStyle = '#00d4ff';
+            ctx.fillText(`B = ${b} (0x${b.toString(16).toUpperCase().padStart(2, '0')})`, 3 * width / 4, 30);
+            drawBinaryBits(ctx, bBinary, 3 * width / 4 - 60, 45, '#00d4ff');
+
+            // Draw multiplication symbol
+            ctx.fillStyle = '#bf00ff';
+            ctx.font = '20px JetBrains Mono';
+            ctx.fillText('⊗', width / 2, 80);
+
+            // Draw polynomial representation
+            ctx.font = '10px JetBrains Mono';
+            ctx.fillStyle = '#8888aa';
+            ctx.fillText('GF(2⁸) mod (x⁸+x⁴+x³+x+1)', width / 2, 110);
+
+            // Draw result
+            ctx.fillStyle = '#f0ff00';
+            ctx.font = '14px JetBrains Mono';
+            ctx.fillText(`Result = ${result} (0x${result.toString(16).toUpperCase().padStart(2, '0')})`, width / 2, 150);
+            drawBinaryBits(ctx, resultBinary, width / 2 - 60, 165, '#f0ff00');
+        }
+
+        /**
+         * Draws binary bits as colored boxes
+         */
+        function drawBinaryBits(ctx, binary, x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                const bit = binary[i];
+                ctx.fillStyle = bit === '1' ? color : '#2a2a3a';
+                ctx.fillRect(x + i * 15, y, 12, 20);
+                ctx.fillStyle = bit === '1' ? '#0a0a0f' : '#6a6a7a';
+                ctx.font = '10px JetBrains Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(bit, x + i * 15 + 6, y + 14);
+            }
+        }
+
+        /**
+         * Draws the S-Box visualization
+         */
+        function drawSBoxVisualization(input, output) {
+            const canvas = document.getElementById('sbox-canvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            const width = rect.width;
+            const height = rect.height;
+
+            // Clear
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw input
+            ctx.font = '14px JetBrains Mono';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#00d4ff';
+            ctx.fillText(`Input: ${input} (0x${input.toString(16).toUpperCase().padStart(2, '0')})`, width / 4, 40);
+
+            // Draw S-Box representation
+            ctx.strokeStyle = '#bf00ff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(width / 2 - 40, 60, 80, 60);
+            ctx.fillStyle = '#bf00ff';
+            ctx.font = '12px JetBrains Mono';
+            ctx.fillText('S-Box', width / 2, 95);
+
+            // Draw arrows
+            ctx.strokeStyle = '#00d4ff';
+            ctx.beginPath();
+            ctx.moveTo(width / 4 + 80, 40);
+            ctx.lineTo(width / 2 - 45, 90);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#00ff41';
+            ctx.beginPath();
+            ctx.moveTo(width / 2 + 45, 90);
+            ctx.lineTo(3 * width / 4 - 80, 40);
+            ctx.stroke();
+
+            // Draw output
+            ctx.fillStyle = '#00ff41';
+            ctx.font = '14px JetBrains Mono';
+            ctx.fillText(`Output: ${output} (0x${output.toString(16).toUpperCase().padStart(2, '0')})`, 3 * width / 4, 40);
+
+            // Draw transformation steps
+            ctx.font = '10px JetBrains Mono';
+            ctx.fillStyle = '#8888aa';
+            ctx.textAlign = 'left';
+            ctx.fillText('1. Compute multiplicative inverse in GF(2⁸)', 20, 150);
+            ctx.fillText('2. Apply affine transformation', 20, 170);
+            ctx.fillText('3. XOR with constant 0x63', 20, 190);
+        }
+
+        // GF Multiplication calculator
+        document.getElementById('gf-calc').addEventListener('click', () => {
+            const a = parseInt(document.getElementById('gf-a').value) || 0;
+            const b = parseInt(document.getElementById('gf-b').value) || 0;
+            const result = gfMultiply(a & 0xFF, b & 0xFF);
+            document.getElementById('gf-result').textContent = result;
+            drawGFVisualization(a & 0xFF, b & 0xFF, result);
+        });
+
+        // S-Box calculator
+        document.getElementById('sbox-calc').addEventListener('click', () => {
+            const input = parseInt(document.getElementById('sbox-input').value) || 0;
+            const output = SBOX[input & 0xFF];
+            document.getElementById('sbox-result').textContent = `0x${output.toString(16).toUpperCase().padStart(2, '0')}`;
+            drawSBoxVisualization(input & 0xFF, output);
+        });
+
+        // Initialize math visualizations when Learn tab is shown
+        document.querySelector('[data-tab="learn"]').addEventListener('click', () => {
+            setTimeout(() => {
+                const a = parseInt(document.getElementById('gf-a').value) || 87;
+                const b = parseInt(document.getElementById('gf-b').value) || 131;
+                drawGFVisualization(a, b, gfMultiply(a, b));
+
+                const input = parseInt(document.getElementById('sbox-input').value) || 25;
+                drawSBoxVisualization(input, SBOX[input]);
+            }, 100);
+        });
+
+        // Handle window resize for math canvases
+        window.addEventListener('resize', () => {
+            if (document.getElementById('learn-tab').classList.contains('active')) {
+                const a = parseInt(document.getElementById('gf-a').value) || 87;
+                const b = parseInt(document.getElementById('gf-b').value) || 131;
+                drawGFVisualization(a, b, gfMultiply(a, b));
+
+                const input = parseInt(document.getElementById('sbox-input').value) || 25;
+                drawSBoxVisualization(input, SBOX[input]);
+            }
+        });
+    </script>
+</body>
+</html>
