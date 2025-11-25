@@ -27,31 +27,6 @@
 
 ---
 
-## 🚀 Quick Start
-
-### Option 1: GitHub Pages (Recommended)
-
-1. Fork this repository
-2. Go to Settings → Pages
-3. Select "main" branch and save
-4. Visit `https://yourusername.github.io/cryptovis`
-
-### Option 2: Local
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/cryptovis.git
-
-# Open in browser (no server needed!)
-open index.html
-```
-
-### Option 3: CodePen/JSFiddle
-
-Just copy the entire `index.html` content into any HTML playground!
-
----
-
 ## 🔍 How It Works
 
 ### The Encryption Pipeline
